@@ -1,5 +1,6 @@
 // bridge between drone simulator and openAI 
 // constructs sim request -> json + api key -> Coroutine -> OpenAI -> cleans data -> drone simulator
+
 using UnityEngine;
 using UnityEngine.Networking;
 using System.Text;
@@ -9,7 +10,7 @@ using System;
 public class AIService : MonoBehaviour
 {
     [Header("api settings")]
-    public string apiKey = ""; 
+    public string apiKey = System.Environment.GetEnvironmentVariable("OPENAI_API_KEY");
     public string apiUrl = "https://api.openai.com/v1/chat/completions";
 
     public void SendPrompt(string systemPrompt, string userPrompt, Action<string> callback){

@@ -9,7 +9,7 @@
 ## 🎯 Objective
 An AI-native drone flight simulator that combines high-fidelity **Gaussian Splatting** environments with a real-time **Generative AI Flight Commentator**. We bridge the gap between realistic drone physics and interactive, personality-driven feedback to create a more engaging pilot training experience.
 
-## Motivation 
+## 💫 Motivation 
 TODO: fill this out 
 
 ## 🚀 Features
@@ -18,6 +18,7 @@ TODO: fill this out
 Using **OpenAI's GPT-4o**, the simulator monitors drone physics (velocity, angular acceleration, proximity) to provide live feedback.
 * **Persona:** A sarcastic Gen Z flight instructor.
 * **Context-Aware:** Detects events such as smooth turns, crashes, near misses, and idling/stuck.
+* **Logging:** Keeps a timestamped log of a user's comments in a flight. 
 
 ### 📍 Semantic Landmark Navigation
 Users can map a 3D space and set goal landmarks. The **Goal Manager** tracks progress and triggers celebratory (or mocking) commentary upon arrival.

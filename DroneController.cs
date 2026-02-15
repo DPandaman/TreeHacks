@@ -1,3 +1,5 @@
+// drone controlling logic 
+
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -16,7 +18,7 @@ public class DroneController : MonoBehaviour
 
     private Rigidbody rb;
     private Vector2 cyclicInput;
-    private float throttleInput;
+    public float throttleInput;
     private float yawInput;
 
     void Awake(){

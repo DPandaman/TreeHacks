@@ -1,5 +1,10 @@
+// contains the logic for generative commentary 
+// monitors physics and gives live feedback
+
 using UnityEngine;
 using TMPro;
+using System.Collections.Generic; 
+using System; 
 
 public class DroneCommentator : MonoBehaviour
 {
@@ -8,6 +13,7 @@ public class DroneCommentator : MonoBehaviour
     public TextMeshProUGUI uiText;
     public DroneController droneCtrl; // need this for throttle check
     public Transform currentGoal;     // need this for goal check
+    public VoiceService voiceService; // for speaking comments out loud 
 
     // settings
     [TextArea(3, 10)]
@@ -22,7 +28,8 @@ public class DroneCommentator : MonoBehaviour
     public float jerkThreshold = 15f;   
     private float smoothTurnTimer = 0f;
     public float smoothTurnMinDuration = 1.5f; // how long to hold the turn 
-
+    public List<string> flightLog = new List<string>(); // stores the full history of comments
+    
     void Start()
     {
         // get physics ref
@@ -67,9 +74,11 @@ public class DroneCommentator : MonoBehaviour
 
         // check if stuck 
         if (droneCtrl != null){
-            float throttleInput = droneCtrl.throttlePower; // using your power variable
-            if (Mathf.Abs(throttleInput) > 0.8f && speed < 0.1f && !isTalking){
-                TriggerCommentary("stuck", "wall");
+            //hitting throttle but not moving 
+            if (droneCtrl.throttleInput > 0.8f && speed < 0.1f && !isTalking){
+                if (Physics.Raycast(transform.position, transform.forward, 1.0f)){
+                    TriggerCommentary("stuck", "wall");
+                }
             }
         }
 
@@ -119,26 +128,47 @@ public class DroneCommentator : MonoBehaviour
     }
 
    public void TriggerCommentary(string eventType, string objectHit){
-    isTalking = true;
-    uiText.text = "AI Thinking...";
+        isTalking = true;
+        uiText.text = "AI Thinking...";
 
-    float speedMph = rb.linearVelocity.magnitude * 2.237f;
+        float speedMph = rb.linearVelocity.magnitude * 2.237f;
 
-    // custom instruction for high-skill moments
-    string skillBonus = "";
-    if (eventType == "smooth turn" || eventType == "tight gap navigation" || eventType == "goal reached"){        
-        skillBonus = " IMPORTANT: Start your response with 'chat is that rizz'.";
+        // custom instruction for high-skill moments
+        string skillBonus = "";
+        if (eventType == "smooth turn" || eventType == "tight gap navigation" || eventType == "goal reached"){        
+            skillBonus = " IMPORTANT: Start your response with 'chat is that rizz'.";
+        }
+
+        // build prompts
+        string systemPrompt = personaPrompt + skillBonus;
+        string userPrompt = $"I just caused a {eventType} event involving {objectHit} at {speedMph:F1} MPH. React.";
+
+        aiService.SendPrompt(systemPrompt, userPrompt, (response) => 
+        {
+            uiText.text = response;
+            LogCommentary(eventType, response);  // log the comment with a timestamp
+            if (voiceService != null) voiceService.Speak(response);
+            Invoke("ResetTalking", 5f);
+        });
     }
 
-    // build prompts
-    string systemPrompt = personaPrompt + skillBonus;
-    string userPrompt = $"I just caused a {eventType} event involving {objectHit} at {speedMph:F1} MPH. React.";
+    public void LogCommentary(string eventType, string response){
+    string timestamp = DateTime.Now.ToString("HH:mm:ss");
+    string logEntry = $"[{timestamp}] {eventType.ToUpper()}: {response}"; // format line
+    
+    flightLog.Add(logEntry); // add to list
+    
+    // print to console so you can see it live
+    Debug.Log("<color=cyan>Flight Logged:</color> " + logEntry);
+    }
 
-    aiService.SendPrompt(systemPrompt, userPrompt, (response) => 
-    {
-        uiText.text = response;
-        Invoke("ResetTalking", 5f);
-    });
-}
     void ResetTalking() => isTalking = false;
+
+    public void ExportFlightLog(){
+        Debug.Log("--- FLIGHT SUMMARY ---");
+        foreach (string entry in flightLog){
+            Debug.Log(entry);
+        }
+        Debug.Log("----------------------");
+    }
 }

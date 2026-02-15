@@ -1,46 +1,106 @@
+// class for real-time generative commentary
+
 using UnityEngine;
 using TMPro;
 
 public class DroneCommentator : MonoBehaviour
 {
-    [Header("Connections")]
-    [TextArea(3, 10)] // Makes a box in unity Inspector
-    public string personaPrompt = "You are a sarcastic robot. Mock the pilot's failures.";
-    public AIService aiService;       // Drag 'AI_Manager' here
-    public TextMeshProUGUI uiText;    // Drag 'AI_Text' here
+    // connections
+    public AIService aiService;
+    public TextMeshProUGUI uiText;
 
+    // settings
+    [TextArea(3, 10)]
+    public string personaPrompt = "You are a Gen Z flight commentator. Use slang like 'cooked', 'bet', 'no cap', and 'skill issue'. Keep it short.";
+    
+    // state variables 
     private bool isTalking = false;
+    private float idleTimer = 0f;
+    private Rigidbody rb;
 
-    void OnCollisionEnter(Collision collision)
+    void Start()
     {
-        // Only talk if we hit something hard and aren't already talking
-        if (collision.relativeVelocity.magnitude > 2f && !isTalking)
-        {
-            TriggerCommentary("crash", collision.gameObject.name);
+        // get physics ref
+        rb = GetComponent<Rigidbody>(); 
+    }
+
+    void Update()
+    {
+        // check speeding
+        float speed = rb.linearVelocity.magnitude; //get speed 
+        if (speed > 15f && !isTalking){
+            TriggerCommentary("speeding", "nothing");
+        }
+
+        // check if flying unstable 
+        if (rb.angularVelocity.magnitude > 5f && !isTalking){
+             TriggerCommentary("losing control", "gravity");
+        }
+
+        // check idle
+        if (speed < 0.1f){
+            idleTimer += Time.deltaTime;
+        }
+        else{
+            idleTimer = 0f;
+        }
+
+        // trigger if idle too long
+        if (idleTimer > 10f && !isTalking){
+            TriggerCommentary("idle", "nothing");
+            idleTimer = 0f;
+        }
+
+        // trigger if u almost hit smth but didn't 
+        // cast ray forward 1 meter
+        if (Physics.Raycast(transform.position, transform.forward, out RaycastHit hit, 1.0f)){
+            // check if we are moving fast toward it
+            if (rb.linearVelocity.magnitude > 5f && !isTalking){
+                TriggerCommentary("near miss", hit.collider.name);
+            }
+        }
+
+        // check if stuck 
+        float throttleInput = droneCtrl.throttleValue;  // check high throttle 
+        // full throttle but not moving
+        if (Mathf.Abs(throttleInput) > 0.8f && rb.linearVelocity.magnitude < 0.1f && !isTalking){
+            TriggerCommentary("stuck", "wall");
+        }
+
+        // check if updside down 
+        if (Vector3.Dot(transform.up, Vector3.down) > 0.5f && !isTalking){// check dot product of up vector
+            TriggerCommentary("upside down", "gravity");
         }
     }
 
-    public void TriggerCommentary(string eventType, string objectHit)
-    {
+    void OnCollisionEnter(Collision collision){
+        // runs only if we crash into smth hard 
+        if (collision.relativeVelocity.magnitude > 2f && !isTalking){
+            TriggerCommentary("crash", collision.gameObject.name); //tells u what object u hit 
+        }
+    }
+
+    public void TriggerCommentary(string eventType, string objectHit){
+        // set talking state
         isTalking = true;
-        uiText.text = "AI Thinking..."; // feedback while waiting 
+        uiText.text = "AI Thinking...";
 
-        // prompt 
-        string systemPrompt = "You are a Gen Z flight commentator. Use slang like 'cooked', 'bet', 'no cap', and 'skill issue'. Keep it short."; 
-        string userPrompt = $"I just caused a {eventType} involving {objectHit}. React.";
+        // calc mph
+        float speedMph = rb.linearVelocity.magnitude * 2.237f;
 
-        // Call the Brain
+        // build prompts
+        string systemPrompt = personaPrompt;
+        string userPrompt = $"I just caused a {eventType} event involving {objectHit} at {speedMph:F1} MPH. React.";
+
+        // call ai
         aiService.SendPrompt(systemPrompt, userPrompt, (response) => 
         {
-            // This runs when the API replies
             uiText.text = response;
-            isTalking = false;
             
-            // Clear text after 5 seconds
-            CancelInvoke("ClearText");
-            Invoke("ClearText", 5f);
+            // cooldown 5s
+            Invoke("ResetTalking", 5f);
         });
     }
 
-    void ClearText() => uiText.text = "";
+    void ResetTalking() => isTalking = false;
 }

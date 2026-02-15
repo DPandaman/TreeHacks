@@ -4,11 +4,13 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Rigidbody))]
 public class DroneController : MonoBehaviour
 {
+    public DroneController droneCtrl; 
+    
     [Header("Drone Settings")]
     public float throttlePower = 20f;  // Vertical lift
     public float cyclicPower = 5f;     // Pitch & Roll speed (Tilt)
     public float yawPower = 2f;        // Spinning speed
-
+    
     [Header("Input References")]
     public InputActionReference throttleAction; // Left Stick Y
     public InputActionReference cyclicAction;   // Right Stick (X/Y)

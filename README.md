@@ -7,37 +7,41 @@
 * Rohan Godha (Georgia Tech)
 
 ## 🎯 Objective
-An AI-native drone flight simulator that combines high-fidelity **Gaussian Splatting** environments with a real-time **Generative AI Flight Commentator**. We bridge the gap between realistic drone physics and interactive, personality-driven feedback to create a more engaging pilot training experience.
+An AI-native drone flight simulator that leverages Gaussian Splatting and Vision-Language Models (VLM) to automate disaster response training. By combining high-fidelity 3D reconstructions with local LLM-driven spatial intelligence, RealityRip transforms static scans into dynamic, mission-critical obstacle courses. 
 
 ## 💫 Motivation 
-TODO: fill this out 
+Traditional flight simulators rely on manual level design, which cannot scale to the unpredictability of disaster zones. Following events like earthquakes or structural collapses, first responders need immediate, accurate digital twins to plan rescue routes. RealityRip automates this by using VLMs to "see" a room scan, identify survivors/hazards, and generate optimal flight paths—all before a pilot even takes off.
 
 ## 🚀 Features
 
-### 🧠 Real-Time Generative Commentary
-Using **OpenAI's GPT-4o**, the simulator monitors drone physics (velocity, angular acceleration, proximity) to provide live feedback.
-* **Persona:** A sarcastic Gen Z flight instructor.
-* **Context-Aware:** Detects events such as smooth turns, crashes, near misses, and idling/stuck.
-* **Logging:** Keeps a timestamped log of a user's comments in a flight. 
+### 🧠 Semantic Mission Generation (VLM-Driven)
+The core of RealityRip is its **Automated Goalpost System**. 
+* **User Intent Prompting:** At startup, the system prompts the user for their motives (e.g., "Search for survivors in an earthquake zone"). 
+* **Automated Placement:** Using a **local VLM (LLaVA/Moondream)** running on the **NVIDIA GX10**, the system identifies semantic anchors in the Gaussian Splat (e.g., "void under a collapsed table") and instantiates 3D goalposts automatically based on the user's intent.
+* **Autonomous Pathfinding:** The system computes a smooth **Bezier Spline** trajectory through identified goals. If no specific path direction is provided, the **Mission Controller** generates a $C^1$ continuous optimal path for maximum search efficiency.
 
-### 📍 Semantic Landmark Navigation
-Users can map a 3D space and set goal landmarks. The **Goal Manager** tracks progress and triggers celebratory (or mocking) commentary upon arrival.
-* **Dynamic Goals:** Fly to the "Piano," "Kitchen," or "Tree" based on the environment scan.
+### 📍 Gaussian Splatting & Digital Twins
+Instead of traditional low-poly assets, we use 3D reconstructions of real-world spaces.
+* **Spatial Fidelity:** Navigates an exact 1:1 replica of physical environments.
+* **Semantic Grounding:** The VLM identifies "Kitchens," "Pianos," or "Debris" directly from the splat data.
+
+
+### 🎙️ Multi-Map Dynamic Commentary
+* **Vibe Customization:** Users can toggle the commentator’s personality (e.g., "Gen Z Hacker" vs. "Tactical Dispatcher").
+* **Map-Aware Personas:** * **Disaster Map:** High-stakes, serious, and instructive feedback focused on structural integrity and survivor safety.
+    * **Stanford Engineering Quad:** Technical, O-notation roasts, and Stanford-specific humor.
 
 ### 🎮 Physics-Driven FPV Controller
-Custom C# controller designed for the **RadioMaster Pocket** (or standard gamepads).
-* **Acro-Lite Mode:** Includes stabilization logic to help beginners navigate complex 3D scans.
-* **Precision Physics:** Built on Unity’s Rigidbody system with specific lift and torque calculations.
+Custom C# controller designed for the **RadioMaster Pocket** and standard gamepads.
+* **Acro-Lite Mode:** Stabilization logic helps beginners navigate tight gaps in 3D scans.
+* **Local Inference:** All AI commentary and goal generation are processed locally on the **GX10** to minimize latency and ensure data privacy in field operations.
 
-### ✨ Gaussian Splatting Environments
-Instead of traditional low-poly assets, we use 3D reconstructions of real-world spaces, providing an immersive training ground for pilots.
 
 ## 🛠 Technical Stack
-* **Engine:** Unity (C#)
-* **AI Engine:** OpenAI API (GPT-4o)
-* **Input:** Unity Input System (RadioMaster/Joystick support)
-* **Environment:** Gaussian Splatting / 3D Reconstruction
-
+* **Engine:** Unity (C#) + **Unity Splines Package**
+* **Local AI Engine:** Ollama / LocalAI (Llama 3, LLaVA-v1.5)
+* **Hardware:** NVIDIA GX10 (Edge Inference), RadioMaster Pocket
+* **Environment:** Gaussian Splatting 
 
 ## 🌐 Digital Twin Integration
 The simulator functions as a **Digital Twin** of real-world environments. By utilizing Gaussian Splatting for spatial accuracy and real-time telemetry-driven AI, we create a closed-loop system where:

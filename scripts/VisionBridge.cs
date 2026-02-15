@@ -1,4 +1,4 @@
-// captures drone view and sends it to local Ollama instance on GX10 
+// captures drone pov and sends to local vlm for scene analysis
 
 using UnityEngine;
 using UnityEngine.Networking;
@@ -9,84 +9,131 @@ using System;
 public class VisionBridge : MonoBehaviour
 {
     [Header("VLM Config")]
-    // local inference endpoint. running on the GX10 via ollama/localai
-    // ensure port 11434 is exposed and firewall isn't blocking
-    public string localApiUrl = "http://localhost:11434/v1/chat/completions"; 
-    public string modelName = "llava"; // using llava/moondream for lower inference latency
-    public Camera droneCamera; 
+    // local inference endpoint (ollama openai-compatible api)
+    public string localApiUrl = "http://localhost:11434/v1/chat/completions";
+    public string modelName = "llava";
+    public Camera droneCamera;
 
-    public void ScanScene(string prompt, Action<string> callback)
-    {
-        // spin up the async routine to avoid blocking the main thread (rendering)
+    [Header("Capture Settings")]
+    public int captureResolution = 512;
+    public int jpegQuality = 50;
+    public int requestTimeout = 30;
+
+    public void ScanScene(string prompt, Action<string> callback){
+        if (droneCamera == null){
+            Debug.LogError("VisionBridge: drone camera not assigned");
+            callback?.Invoke(null);
+            return;
+        }
+
         StartCoroutine(ProcessScan(prompt, callback));
     }
 
-    IEnumerator ProcessScan(string prompt, Action<string> callback)
-    {
-        // Measurement Acquisition
-        // creating a temp render texture to grab the current frame buffer
-        // standard 512x512 resolution to balance VLM context window vs. visual fidelity
-        RenderTexture rt = new RenderTexture(512, 512, 24);
-        droneCamera.targetTexture = rt; 
-        Texture2D tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
-        
-        // force render trigger
+    IEnumerator ProcessScan(string prompt, Action<string> callback){
+        // capture frame from drone camera
+        RenderTexture rt = new RenderTexture(captureResolution, captureResolution, 24);
+        droneCamera.targetTexture = rt;
         droneCamera.Render();
         RenderTexture.active = rt;
-        
-        // read pixels from GPU to CPU memory
-        // expensive operation, optimized by reusing the rect
+
+        Texture2D tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
         tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
         tex.Apply();
-        
-        // cleanup to prevent memory leaks in VRAM
-        droneCamera.targetTexture = null; 
-        RenderTexture.active = null; 
+
+        // cleanup gpu resources
+        droneCamera.targetTexture = null;
+        RenderTexture.active = null;
         Destroy(rt);
 
-        // 2. Data Marshalling
-        // encoding to base64 jpg. standard protocol for sending image tensors to llms via json
-        // compression quality 50 is a heuristic: good enough for object detection, low bandwidth
-        byte[] bytes = tex.EncodeToJPG(50); 
+        // encode to base64 jpg
+        byte[] bytes = tex.EncodeToJPG(jpegQuality);
         string base64Image = Convert.ToBase64String(bytes);
-        Destroy(tex); // yeet the texture
+        Destroy(tex);
 
-        // 3. Construct Payload
-        // constructing the JSON body for the POST request
-        // mirroring the openai chat completion schema
+        // build openai-compatible multimodal payload
+        // ollama /v1/chat/completions expects image_url with data uri for vision models
+        string safePrompt = prompt.Replace("\"", "\\\"").Replace("\n", " ");
         string json = $@"{{
             ""model"": ""{modelName}"",
             ""messages"": [
                 {{
                     ""role"": ""user"",
-                    ""content"": ""{prompt} \n[IMG]{base64Image}[/IMG]"" 
+                    ""content"": [
+                        {{
+                            ""type"": ""text"",
+                            ""text"": ""{safePrompt}""
+                        }},
+                        {{
+                            ""type"": ""image_url"",
+                            ""image_url"": {{
+                                ""url"": ""data:image/jpeg;base64,{base64Image}""
+                            }}
+                        }}
+                    ]
                 }}
             ],
             ""stream"": false
         }}";
 
-        var request = new UnityWebRequest(localApiUrl, "POST");
-        byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
-        request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-        request.downloadHandler = new DownloadHandlerBuffer();
-        request.SetRequestHeader("Content-Type", "application/json");
-
-        // debug: sending packet
-        // Debug.Log("VisionBridge: propagating state to VLM...");
-        yield return request.SendWebRequest();
-
-        if (request.result == UnityWebRequest.Result.Success)
+        // send request to local vlm
+        using (var request = new UnityWebRequest(localApiUrl, "POST"))
         {
-            // measurement update successful
-            string response = request.downloadHandler.text;
-            // passing raw json to callback for parsing
-            callback(response); 
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.timeout = requestTimeout;
+
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                // parse content from response json
+                string content = ParseResponseContent(request.downloadHandler.text);
+
+                if (content != null){
+                    callback?.Invoke(content);
+                }
+                else{
+                    Debug.LogError("VisionBridge: failed to parse vlm response");
+                    callback?.Invoke(null);
+                }
+            }
+            else
+            {
+                Debug.LogError($"VisionBridge: request failed - {request.error}");
+                callback?.Invoke(null);
+            }
         }
-        else
-        {
-            // connection refused or timeout. 
-            // probable cause: ollama service not running or port mismatch
-            Debug.LogError($"VisionBridge: inference failed. error: {request.error}");
+    }
+
+    // extract "content" field from openai-style chat completion response
+    string ParseResponseContent(string json)
+    {
+        // target the assistant message content
+        string key = "\"content\":";
+        int keyIndex = json.LastIndexOf(key);
+        if (keyIndex == -1) return null;
+
+        // skip key and whitespace to reach opening quote
+        int start = keyIndex + key.Length;
+        while (start < json.Length && (json[start] == ' ' || json[start] == '\n' || json[start] == '\r'))
+            start++;
+
+        if (start >= json.Length || json[start] != '"') return null;
+        start++; // skip opening quote
+
+        // walk to closing quote, respecting escaped quotes
+        int end = start;
+        while (end < json.Length){
+            if (json[end] == '"' && json[end - 1] != '\\') break;
+            end++;
         }
+
+        if (end >= json.Length) return null;
+
+        string content = json.Substring(start, end - start);
+        content = content.Replace("\\n", "\n").Replace("\\\"", "\"");
+        return content;
     }
 }

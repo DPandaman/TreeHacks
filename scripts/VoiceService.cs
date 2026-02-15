@@ -21,7 +21,7 @@ public class VoiceService : MonoBehaviour
 
     IEnumerator PostTTS(string text){
         // build tts json
-        string json = $@"{{
+        string json = $@"{{a
             ""model"": ""tts-1"",
             ""input"": ""{text}"",
             ""voice"": ""shimmer"" 

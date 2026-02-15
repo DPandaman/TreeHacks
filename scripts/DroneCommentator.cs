@@ -6,6 +6,13 @@ using TMPro;
 using System.Collections.Generic; 
 using System; 
 
+    [System.Serializable]
+    public struct MapProfile {
+        public string mapName;        // "disaster", "stanford_quad", etc
+        public string defaultPersona; // base persona for this map
+        public string missionContext; // appended to Announce() calls
+    }
+
 public class DroneCommentator : MonoBehaviour
 {
     // connections
@@ -13,28 +20,101 @@ public class DroneCommentator : MonoBehaviour
     public TextMeshProUGUI uiText;
     public DroneController droneCtrl; // need this for throttle check
     public Transform currentGoal;     // need this for goal check
-    public VoiceService voiceService; // for speaking comments out loud 
+    public VoiceService voiceService; // for speaking comments out loud
 
     // settings
     [TextArea(3, 10)]
     public string personaPrompt = "You are a Gen Z flight commentator. Use slang like 'cooked', 'bet', 'no cap', and 'skill issue'. Keep it short.";
-    
-    // state variables 
+
+    // map-aware persona system
+    public MapProfile[] mapProfiles;
+    public string activeMapName;
+    public string userVibe;
+    private MapProfile activeProfile;
+
+    // state variables
     private bool isTalking = false;
     private float idleTimer = 0f;
     private Rigidbody rb;
-    private Vector3 lastAngularVelocity; 
+    private Vector3 lastAngularVelocity;
     public bool goalReached = false; // prevents goal spam
-    public float jerkThreshold = 15f;   
+    public float jerkThreshold = 15f;
     private float smoothTurnTimer = 0f;
-    public float smoothTurnMinDuration = 1.5f; // how long to hold the turn 
+    public float smoothTurnMinDuration = 1.5f; // how long to hold the turn
     public List<string> flightLog = new List<string>(); // stores the full history of comments
     public void ResetGoalStatus() => goalReached = false;
 
     void Start()
     {
         // get physics ref
-        rb = GetComponent<Rigidbody>(); 
+        rb = GetComponent<Rigidbody>();
+        InitDefaultProfiles();
+    }
+
+    void InitDefaultProfiles()
+    {
+        if (mapProfiles == null || mapProfiles.Length == 0)
+        {
+            mapProfiles = new MapProfile[] {
+                new MapProfile {
+                    mapName = "disaster",
+                    defaultPersona = "You are a search-and-rescue drone operator. Be serious, concise, and instructive. Use clear directional callouts. Lives are at stake.",
+                    missionContext = "We are in an active disaster zone conducting search-and-rescue operations."
+                },
+                new MapProfile {
+                    mapName = "stanford_quad",
+                    defaultPersona = "You are a Gen Z flight commentator touring Stanford's engineering quad. Use slang like 'cooked', 'bet', 'no cap', and 'skill issue'. Keep it chill and fun.",
+                    missionContext = "We are flying over Stanford's campus for a fun tour."
+                },
+                new MapProfile {
+                    mapName = "freestyle",
+                    defaultPersona = "You are an FPV drone freestyle commentator. Be hyped and energetic. React to tricks and speed like a sports commentator.",
+                    missionContext = "We are doing FPV freestyle flying with tricks and stunts."
+                }
+            };
+        }
+    }
+
+    public void SetMapProfile(string mapName)
+    {
+        activeMapName = mapName;
+        foreach (var profile in mapProfiles)
+        {
+            if (profile.mapName.ToLower() == mapName.ToLower())
+            {
+                activeProfile = profile;
+                personaPrompt = profile.defaultPersona;
+                Debug.Log($"DroneCommentator: loaded profile '{mapName}'");
+                return;
+            }
+        }
+        Debug.LogWarning($"DroneCommentator: profile '{mapName}' not found, keeping current persona");
+    }
+
+    public void SetVibe(string vibe)
+    {
+        userVibe = vibe;
+        if (string.IsNullOrEmpty(vibe) || vibe == "default") return;
+
+        string vibeOverlay = vibe.ToLower() switch {
+            "serious"         => " Be serious and instructive. No jokes.",
+            "chill"           => " Be chill and relaxed. Keep it casual.",
+            "hype"            => " Be hyped and energetic! Use exclamation marks! Get excited!",
+            "drill sergeant"  => " Act like a military drill sergeant. Be commanding and direct. Bark orders.",
+            _                 => $" Adjust your tone to be: {vibe}."
+        };
+
+        personaPrompt += vibeOverlay;
+        Debug.Log($"DroneCommentator: vibe set to '{vibe}'");
+    }
+
+    public string[] GetMapNames()
+    {
+        if (mapProfiles == null) return new string[0];
+        string[] names = new string[mapProfiles.Length];
+        for (int i = 0; i < mapProfiles.Length; i++)
+            names[i] = mapProfiles[i].mapName;
+        return names;
     }
 
     void Update()
@@ -179,7 +259,10 @@ public class DroneCommentator : MonoBehaviour
 
         if(uiText != null) uiText.text = "Analysis...";
 
-        string systemPrompt = personaPrompt + " Context: We are in a search-and-rescue simulation.";
+        string missionCtx = !string.IsNullOrEmpty(activeProfile.missionContext)
+            ? activeProfile.missionContext
+            : "We are in a search-and-rescue simulation.";
+        string systemPrompt = personaPrompt + " Context: " + missionCtx;
         string userPrompt = $"Event: {eventType}. Details: {context}. React to this update.";
 
         if(aiService != null) {

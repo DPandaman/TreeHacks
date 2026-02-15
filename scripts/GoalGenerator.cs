@@ -1,4 +1,4 @@
-// turns text from VLM into physical 3d object 
+// AI-driven waypoint generation via GPT-4o spatial reasoning
 
 using UnityEngine;
 using System.Collections.Generic;
@@ -8,64 +8,235 @@ public class RescueGoalGenerator : MonoBehaviour
     [Header("Simulation Parameters")]
     public GameObject goalPrefab; // visualization marker (torus)
     public LayerMask splatLayer;  // gaussian splat mesh collider layer
-    
+
+    [Header("AI Integration")]
+    public AIService aiService;          // gpt-4o for waypoint generation
+    public GoalManager goalManager;      // register spawned goals
+    public float raycastMaxDistance = 50f;
+    public float goalHoverOffset = 0.3f;
+
     // maintaining a list of active waypoints to manage scene clutter
     public List<Transform> activeGoals = new List<Transform>();
 
-    public void GenerateGoalsFromAI(string aiResponse, Transform droneTransform)
+    [System.Serializable]
+    public struct WaypointData {
+        public string name;
+        public float forward;
+        public float right;
+        public float up;
+        public int priority;
+    }
+
+    public void GenerateGoalsFromAI(string vlmDescription, string userPrompt,
+                                    Transform droneTransform, System.Action<bool> onComplete)
     {
-        // reset state for the new measurement update
         ClearGoals();
 
-        Debug.Log($"RescueGoalGen: processing measurement: '{aiResponse}'");
-
-        // 1. Semantic Parsing (The "Measurement Model")
-        // currently using a naive heuristic (keyword matching) instead of strict json parsing
-        // TODO: implement robust json deserialization for production
-        
-        bool targetIdentified = false;
-
-        // hypothesis: if 'table' or 'gap' is detected, high probability of survivor/hazard
-        if (aiResponse.ToLower().Contains("table") || aiResponse.ToLower().Contains("gap"))
+        if (aiService == null)
         {
-             // estimating position: projecting 2.0m forward vector + slight negative Z bias
-             // this assumes the POI is directly in the camera's FOV center
-             Vector3 predictedState = droneTransform.position + droneTransform.forward * 2.0f + Vector3.down * 0.5f;
-             SpawnGoal(predictedState, "Hazard_Gap");
-             targetIdentified = true;
-        }
-        
-        // hypothesis: 'corner' or 'wall' implies structural bounds
-        if (aiResponse.ToLower().Contains("corner") || aiResponse.ToLower().Contains("wall"))
-        {
-             // heuristic: offset to the right to simulate peripheral detection
-             SpawnGoal(droneTransform.position + droneTransform.right * 1.5f, "Structure_Ref");
-             targetIdentified = true;
+            Debug.LogWarning("RescueGoalGen: no AIService assigned, using fallback");
+            SpawnFallbackPattern(droneTransform);
+            onComplete?.Invoke(activeGoals.Count > 0);
+            return;
         }
 
-        // 2. State Correction / Fallback
-        // if the measurement update failed (VLM hallucinated or saw nothing), 
-        // initialize a default search pattern (covariance is high, so we search wide)
-        if (!targetIdentified || activeGoals.Count == 0)
+        string systemPrompt = "You are a spatial reasoning engine for a drone simulator. " +
+            "You receive a scene description from a vision model and a user's mission objective. " +
+            "Identify 2-6 points of interest and output ONLY a JSON array. " +
+            "Each entry: {\"name\": \"snake_case_string\", \"forward\": float_meters, \"right\": float_meters, \"up\": float_meters, \"priority\": int_1_is_highest}. " +
+            "Use realistic distances 1-10m. Output nothing but the JSON array.";
+
+        string userMsg = $"Scene: {vlmDescription}\nMission: {userPrompt}\nOutput JSON array of waypoints:";
+
+        aiService.SendPrompt(systemPrompt, userMsg, (response) =>
         {
-            Debug.LogWarning("RescueGoalGen: measurement invalid. reverting to prior belief (default pattern).");
-            SpawnGoal(droneTransform.position + Vector3.forward * 3f, "Search_Area_Alpha");
-            SpawnGoal(droneTransform.position + Vector3.forward * 5f + Vector3.right * 2f, "Search_Area_Beta");
+            if (string.IsNullOrEmpty(response))
+            {
+                Debug.LogWarning("RescueGoalGen: empty AI response, using fallback");
+                SpawnFallbackPattern(droneTransform);
+                onComplete?.Invoke(activeGoals.Count > 0);
+                return;
+            }
+
+            Debug.Log($"RescueGoalGen: AI response: {response}");
+
+            List<WaypointData> waypoints = ParseWaypointJSON(response);
+
+            if (waypoints.Count == 0)
+            {
+                Debug.LogWarning("RescueGoalGen: failed to parse waypoints, using fallback");
+                SpawnFallbackPattern(droneTransform);
+                onComplete?.Invoke(activeGoals.Count > 0);
+                return;
+            }
+
+            // sort by priority
+            waypoints.Sort((a, b) => a.priority.CompareTo(b.priority));
+
+            foreach (var wp in waypoints)
+            {
+                // compute world position from drone-relative offsets
+                Vector3 worldPos = droneTransform.position
+                    + droneTransform.forward * wp.forward
+                    + droneTransform.right * wp.right
+                    + Vector3.up * wp.up;
+
+                Vector3 snapped = ValidateAndSnap(worldPos, droneTransform);
+                SpawnGoal(snapped, wp.name);
+            }
+
+            Debug.Log($"RescueGoalGen: spawned {activeGoals.Count} AI-generated waypoints");
+            onComplete?.Invoke(activeGoals.Count > 0);
+        });
+    }
+
+    // legacy signature for backward compatibility
+    public void GenerateGoalsFromAI(string aiResponse, Transform droneTransform)
+    {
+        GenerateGoalsFromAI(aiResponse, "", droneTransform, null);
+    }
+
+    List<WaypointData> ParseWaypointJSON(string json)
+    {
+        List<WaypointData> results = new List<WaypointData>();
+
+        // strip markdown code fences if present
+        if (json.Contains("```"))
+        {
+            int fenceStart = json.IndexOf("```");
+            int contentStart = json.IndexOf("\n", fenceStart);
+            if (contentStart == -1) contentStart = fenceStart + 3;
+            else contentStart++;
+
+            int fenceEnd = json.IndexOf("```", contentStart);
+            if (fenceEnd == -1) fenceEnd = json.Length;
+
+            json = json.Substring(contentStart, fenceEnd - contentStart).Trim();
         }
+
+        // find the array
+        int arrayStart = json.IndexOf('[');
+        int arrayEnd = json.LastIndexOf(']');
+        if (arrayStart == -1 || arrayEnd == -1 || arrayEnd <= arrayStart) return results;
+
+        string arrayContent = json.Substring(arrayStart + 1, arrayEnd - arrayStart - 1);
+
+        // parse each object block
+        int searchFrom = 0;
+        while (searchFrom < arrayContent.Length)
+        {
+            int objStart = arrayContent.IndexOf('{', searchFrom);
+            if (objStart == -1) break;
+
+            int objEnd = arrayContent.IndexOf('}', objStart);
+            if (objEnd == -1) break;
+
+            string block = arrayContent.Substring(objStart, objEnd - objStart + 1);
+            searchFrom = objEnd + 1;
+
+            WaypointData wp = new WaypointData();
+            wp.name = ExtractStringValue(block, "name");
+            wp.forward = ExtractFloatValue(block, "forward");
+            wp.right = ExtractFloatValue(block, "right");
+            wp.up = ExtractFloatValue(block, "up");
+            wp.priority = (int)ExtractFloatValue(block, "priority");
+
+            if (string.IsNullOrEmpty(wp.name)) wp.name = $"waypoint_{results.Count}";
+            if (wp.priority == 0) wp.priority = results.Count + 1;
+
+            results.Add(wp);
+        }
+
+        return results;
+    }
+
+    string ExtractStringValue(string block, string key)
+    {
+        string pattern = $"\"{key}\"";
+        int keyIdx = block.IndexOf(pattern);
+        if (keyIdx == -1) return null;
+
+        int colonIdx = block.IndexOf(':', keyIdx + pattern.Length);
+        if (colonIdx == -1) return null;
+
+        // find opening quote
+        int quoteStart = block.IndexOf('"', colonIdx + 1);
+        if (quoteStart == -1) return null;
+
+        int quoteEnd = block.IndexOf('"', quoteStart + 1);
+        if (quoteEnd == -1) return null;
+
+        return block.Substring(quoteStart + 1, quoteEnd - quoteStart - 1);
+    }
+
+    float ExtractFloatValue(string block, string key)
+    {
+        string pattern = $"\"{key}\"";
+        int keyIdx = block.IndexOf(pattern);
+        if (keyIdx == -1) return 0f;
+
+        int colonIdx = block.IndexOf(':', keyIdx + pattern.Length);
+        if (colonIdx == -1) return 0f;
+
+        // collect numeric chars after colon
+        int numStart = colonIdx + 1;
+        while (numStart < block.Length && (block[numStart] == ' ' || block[numStart] == '\t'))
+            numStart++;
+
+        int numEnd = numStart;
+        while (numEnd < block.Length && (char.IsDigit(block[numEnd]) || block[numEnd] == '.' || block[numEnd] == '-'))
+            numEnd++;
+
+        if (numEnd == numStart) return 0f;
+
+        string numStr = block.Substring(numStart, numEnd - numStart);
+        if (float.TryParse(numStr, System.Globalization.NumberStyles.Float,
+                           System.Globalization.CultureInfo.InvariantCulture, out float val))
+            return val;
+
+        return 0f;
+    }
+
+    Vector3 ValidateAndSnap(Vector3 estimated, Transform droneTransform)
+    {
+        // strategy 1: raycast down from above estimated position
+        Vector3 rayOrigin = estimated + Vector3.up * 10f;
+        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hitDown, raycastMaxDistance, splatLayer))
+        {
+            return hitDown.point + Vector3.up * goalHoverOffset;
+        }
+
+        // strategy 2: raycast from drone toward estimated position
+        Vector3 dirToTarget = (estimated - droneTransform.position).normalized;
+        if (Physics.Raycast(droneTransform.position, dirToTarget, out RaycastHit hitForward, raycastMaxDistance, splatLayer))
+        {
+            return hitForward.point + Vector3.up * goalHoverOffset;
+        }
+
+        // strategy 3: accept raw position
+        Debug.LogWarning($"RescueGoalGen: no surface found for waypoint, using raw position");
+        return estimated;
     }
 
     void SpawnGoal(Vector3 pos, string name)
     {
-        // instantiating the visual marker at the estimated coordinates
         GameObject g = Instantiate(goalPrefab, pos, Quaternion.identity);
         g.name = name;
         activeGoals.Add(g.transform);
+        if (goalManager != null) goalManager.AddLandmark(name, g.transform);
+    }
+
+    void SpawnFallbackPattern(Transform droneTransform)
+    {
+        Debug.LogWarning("RescueGoalGen: using default search pattern");
+        SpawnGoal(droneTransform.position + droneTransform.forward * 3f, "Search_Area_Alpha");
+        SpawnGoal(droneTransform.position + droneTransform.forward * 5f + droneTransform.right * 2f, "Search_Area_Beta");
     }
 
     public void ClearGoals()
     {
-        // cleaning up the scene graph
         foreach (var t in activeGoals) Destroy(t.gameObject);
         activeGoals.Clear();
+        if (goalManager != null) goalManager.ClearGeneratedLandmarks();
     }
 }

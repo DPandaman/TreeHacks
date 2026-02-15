@@ -1,6 +1,6 @@
 // contains respawn logic 
 
-using UnityEngine
+using UnityEngine;
 
 public class FlightManager : MonoBehaviour
 {

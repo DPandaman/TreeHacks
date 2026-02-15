@@ -1,4 +1,4 @@
-# [Project title] | TreeHacks 2026
+# RealityRip | TreeHacks 2026
 
 **Team Members:**
 * [Member 1 Name]
@@ -39,6 +39,14 @@ Instead of traditional low-poly assets, we use 3D reconstructions of real-world 
 * **AI Engine:** OpenAI API (GPT-4o)
 * **Input:** Unity Input System (RadioMaster/Joystick support)
 * **Environment:** Gaussian Splatting / 3D Reconstruction
+
+---
+
+### 🌐 Digital Twin Integration
+The simulator functions as a **Digital Twin** of real-world environments. By utilizing Gaussian Splatting for spatial accuracy and real-time telemetry-driven AI, we create a closed-loop system where:
+* **Spatial Fidelity:** The drone navigates an exact 1:1 replica of a physical room.
+* **Physics Mirroring:** Rigidbody dynamics simulate real-world flight constraints (mass, drag, and thrust-to-weight ratios).
+* **AI Observer:** The generative commentator acts as a digital twin of a flight instructor, providing objective telemetry analysis disguised as personality-driven feedback.
 
 ---
 

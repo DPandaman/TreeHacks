@@ -14,6 +14,7 @@ public class MissionController : MonoBehaviour
     public DroneCommentator commentator;
     public GoalManager goalManager;
     public Transform droneTransform;
+    public AIService aiService;
 
     [Header("UI References")]
     public GameObject promptPanel;

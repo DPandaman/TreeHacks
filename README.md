@@ -6,8 +6,6 @@
 * [Member 3 Name]
 * [Member 4 Name]
 
----
-
 ## 🎯 Objective
 An AI-native drone flight simulator that combines high-fidelity **Gaussian Splatting** environments with a real-time **Generative AI Flight Commentator**. We bridge the gap between realistic drone physics and interactive, personality-driven feedback to create a more engaging pilot training experience.
 
@@ -37,7 +35,7 @@ Instead of traditional low-poly assets, we use 3D reconstructions of real-world 
 * **Environment:** Gaussian Splatting / 3D Reconstruction
 
 
-### 🌐 Digital Twin Integration
+## 🌐 Digital Twin Integration
 The simulator functions as a **Digital Twin** of real-world environments. By utilizing Gaussian Splatting for spatial accuracy and real-time telemetry-driven AI, we create a closed-loop system where:
 * **Spatial Fidelity:** The drone navigates an exact 1:1 replica of a physical room.
 * **Physics Mirroring:** Rigidbody dynamics simulate real-world flight constraints (mass, drag, and thrust-to-weight ratios).

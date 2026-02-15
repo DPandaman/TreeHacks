@@ -24,13 +24,13 @@ public class DroneCommentator : MonoBehaviour
     private float idleTimer = 0f;
     private Rigidbody rb;
     private Vector3 lastAngularVelocity; 
-    private bool goalReached = false; // prevents goal spam
+    public bool goalReached = false; // prevents goal spam
     public float jerkThreshold = 15f;   
     private float smoothTurnTimer = 0f;
     public float smoothTurnMinDuration = 1.5f; // how long to hold the turn 
     public List<string> flightLog = new List<string>(); // stores the full history of comments
     public void ResetGoalStatus() => goalReached = false;
-    
+
     void Start()
     {
         // get physics ref

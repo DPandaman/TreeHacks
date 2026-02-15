@@ -41,6 +41,7 @@ public class DroneCommentator : MonoBehaviour
     public float jerkThreshold = 15f;
     private float smoothTurnTimer = 0f;
     public float smoothTurnMinDuration = 1.5f; // how long to hold the turn
+    private float lastThrottle = 0f; // for throttle punch detection
     public List<string> flightLog = new List<string>(); // stores the full history of comments
     public void ResetGoalStatus() => goalReached = false;
 
@@ -126,15 +127,25 @@ public class DroneCommentator : MonoBehaviour
             TriggerCommentary("speeding", "nothing");
         }
 
-        // check if flying unstable 
-        if (rb.angularVelocity.magnitude > 5f && !isTalking){
+        // check if flying unstable (higher threshold in acro since spinning is intentional)
+        float spinThreshold = (droneCtrl != null && droneCtrl.acroMode) ? 8f : 5f;
+        if (rb.angularVelocity.magnitude > spinThreshold && !isTalking){
              TriggerCommentary("losing control", "gravity");
         }
 
-        // check if jerking turns 
+        // check if jerking turns
         Vector3 angularAcceleration = (rb.angularVelocity - lastAngularVelocity) / Time.deltaTime;
         if (angularAcceleration.magnitude > jerkThreshold && !isTalking){
             TriggerCommentary("jerking turns", "joystick");
+        }
+
+        // check for throttle punch (acro feature: quick full-throttle burst)
+        if (droneCtrl != null && droneCtrl.acroMode){
+            float throttleDelta = droneCtrl.throttleInput - lastThrottle;
+            if (throttleDelta > 0.6f && droneCtrl.throttleInput > 0.9f && !isTalking){
+                TriggerCommentary("throttle punch", "the sky");
+            }
+            lastThrottle = droneCtrl.throttleInput;
         }
 
         // check idle
@@ -163,9 +174,11 @@ public class DroneCommentator : MonoBehaviour
             }
         }
 
-        // check if upside down 
+        // check if upside down (in acro this could be an inverted trick)
         if (Vector3.Dot(transform.up, Vector3.down) > 0.5f && !isTalking){
-            TriggerCommentary("upside down", "gravity");
+            bool isAcro = droneCtrl != null && droneCtrl.acroMode;
+            string eventType = (isAcro && speed > 3f) ? "inverted flight" : "upside down";
+            TriggerCommentary(eventType, "gravity");
         }
 
         // check if we passed goal
@@ -214,14 +227,25 @@ public class DroneCommentator : MonoBehaviour
 
         float speedMph = rb.linearVelocity.magnitude * 2.237f;
 
+        // flight mode context
+        string modeCtx = "";
+        if (droneCtrl != null){
+            modeCtx = droneCtrl.acroMode
+                ? " The pilot is flying in ACRO mode (manual/rate control, no stabilization — advanced skill level)."
+                : " The pilot is flying in ANGLE mode (stabilized, auto-leveling — beginner friendly).";
+        }
+
         // custom instruction for high-skill moments
         string skillBonus = "";
-        if (eventType == "smooth turn" || eventType == "tight gap navigation" || eventType == "goal reached"){        
+        if (eventType == "smooth turn" || eventType == "tight gap navigation" || eventType == "goal reached"){
             skillBonus = " IMPORTANT: Start your response with 'chat is that rizz'.";
+        }
+        if (eventType == "throttle punch" || eventType == "inverted flight"){
+            skillBonus = " IMPORTANT: This is an advanced FPV trick. Hype it up.";
         }
 
         // build prompts
-        string systemPrompt = personaPrompt + skillBonus;
+        string systemPrompt = personaPrompt + modeCtx + skillBonus;
         string userPrompt = $"I just caused a {eventType} event involving {objectHit} at {speedMph:F1} MPH. React.";
 
         aiService.SendPrompt(systemPrompt, userPrompt, (response) => 

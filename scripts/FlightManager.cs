@@ -18,9 +18,16 @@ public class FlightManager : MonoBehaviour
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
 
+        // reset audio pitch/volume to idle state
+        AudioSource audio = drone.GetComponent<AudioSource>();
+        if (audio != null){
+            audio.pitch = 1f;
+            audio.volume = 0.2f;
+        }
+
         // reset goal state
-        commentator.ResetGoalStatus(); 
-        
+        if (commentator != null) commentator.ResetGoalStatus();
+
         Debug.Log("<color=yellow>respawned:</color> drone reset to start");
     }
 }

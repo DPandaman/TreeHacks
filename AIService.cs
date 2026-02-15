@@ -1,3 +1,5 @@
+// bridge between drone simulator and openAI 
+// constructs sim request -> json + api key -> Coroutine -> OpenAI -> cleans data -> drone simulator
 using UnityEngine;
 using UnityEngine.Networking;
 using System.Text;
@@ -6,19 +8,17 @@ using System;
 
 public class AIService : MonoBehaviour
 {
-    [Header("API Settings")]
-    //openAI api key 
-    public string apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY"); 
+    [Header("api settings")]
+    public string apiKey = ""; 
     public string apiUrl = "https://api.openai.com/v1/chat/completions";
 
-    public void SendPrompt(string systemPrompt, string userPrompt, Action<string> callback)
-    {
+    public void SendPrompt(string systemPrompt, string userPrompt, Action<string> callback){
+        // start request
         StartCoroutine(PostRequest(systemPrompt, userPrompt, callback));
     }
 
-    IEnumerator PostRequest(string systemRole, string userMessage, Action<string> callback)
-    {
-        // Simple JSON construction for OpenAI Chat format
+    IEnumerator PostRequest(string systemRole, string userMessage, Action<string> callback){
+        // build json body
         string json = $@"
         {{
             ""model"": ""gpt-4o"",
@@ -28,6 +28,7 @@ public class AIService : MonoBehaviour
             ]
         }}";
 
+        // setup web request
         var request = new UnityWebRequest(apiUrl, "POST");
         byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
         request.uploadHandler = new UploadHandlerRaw(bodyRaw);
@@ -37,16 +38,21 @@ public class AIService : MonoBehaviour
 
         yield return request.SendWebRequest();
 
-        if (request.result == UnityWebRequest.Result.Success)
-        {
-            // You'll need a tiny JSON parser here or use a library
-            // For hackathon speed, just pass the raw text if you're lazy, 
-            // but ideally parse 'choices[0].message.content'
-            callback(request.downloadHandler.text); 
+        if (request.result == UnityWebRequest.Result.Success){
+            // clean up message from open ai 
+            string responseText = request.downloadHandler.text;
+            string key = "\"content\": \"";
+            int start = responseText.IndexOf(key) + key.Length;
+            int end = responseText.IndexOf("\"", start);
+            
+            string cleanMessage = responseText.Substring(start, end - start);
+            
+            cleanMessage = cleanMessage.Replace("\\n", "\n");
+            
+            callback(cleanMessage); 
         }
-        else
-        {
-            Debug.LogError("AI Error: " + request.error);
+        else{
+            Debug.LogError("ai error: " + request.error);
         }
     }
 }

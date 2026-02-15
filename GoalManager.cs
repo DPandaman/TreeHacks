@@ -1,43 +1,67 @@
+// gps and mission logic: stores list of specific locations in the map 
+// you can choose which location the drone will fly toward 
+
 using UnityEngine;
 using System.Collections.Generic;
-using System.Linq; // Needed for fancy list searching
+using System.Linq; 
 
 public class GoalManager : MonoBehaviour
 {
     [System.Serializable]
     public struct Landmark {
-        public string name;      // e.g. "Kitchen"
-        public Transform location; // The empty GameObject at that spot
+        public string name;      // e.g. "kitchen"
+        public Transform location; // spot in 3d space
     }
 
-    public List<Landmark> landmarks; // Drag all your room spots here
-    public DroneCommentator commentator; // Drag your drone here
+    // connections
+    public List<Landmark> landmarks; // list of room spots
+    public DroneCommentator commentator; // drone ref
 
-    // Call this from your UI or AI script
-    public void SetActiveGoal(string goalName)
-    {
-        // Find the landmark with the matching name (case-insensitive)
+    public void SetActiveGoal(string goalName){
+        // find spot by name
         Landmark target = landmarks.FirstOrDefault(l => l.name.ToLower() == goalName.ToLower());
 
-        if (target.location != null)
-        {
-            // Tell the commentator: "This is your new target"
+        if (target.location != null){
+            // update commentator target
             commentator.currentGoal = target.location;
-            Debug.Log($"Goal set to: {target.name}");
+            
+            // reset goal flag so ai can trigger again
+            commentator.goalReached = false; 
+            
+            Debug.Log($"goal set to: {target.name}");
         }
-        else
-        {
-            Debug.LogWarning($"Could not find landmark: {goalName}");
+        else{
+            Debug.LogWarning($"landark not found: {goalName}");
         }
     }
 
-    // Optional: Cycle to the next random goal for a game mode
-    public void SetRandomGoal()
-    {
-        if (landmarks.Count > 0)
-        {
+    public void SetRandomGoal(){
+        // pick random spot from list
+        if (landmarks.Count > 0){
             int rnd = Random.Range(0, landmarks.Count);
             commentator.currentGoal = landmarks[rnd].location;
+            commentator.goalReached = false;
         }
+    }
+
+    // run this to find all landmarks under a specific parent object
+    public void FindAllLandmarks(){
+        // clear existing list
+        landmarks.Clear();
+
+        // look at all children of this manager
+        foreach (Transform child in transform){
+            Landmark l;
+            l.name = child.name; // uses the gameobject name as the goal name
+            l.location = child;
+            landmarks.Add(l);
+        }
+    
+        Debug.Log($"found {landmarks.Count} landmarks");
+    }
+
+    void Start(){
+        // find them automatically when the game starts
+        FindAllLandmarks();
     }
 }

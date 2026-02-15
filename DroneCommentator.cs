@@ -48,7 +48,6 @@ public class DroneCommentator : MonoBehaviour
         if (angularAcceleration.magnitude > jerkThreshold && !isTalking){
             TriggerCommentary("jerking turns", "joystick");
         }
-        lastAngularVelocity = rb.angularVelocity; // update for next frame
 
         // check idle
         if (speed < 0.1f) idleTimer += Time.deltaTime;
@@ -109,6 +108,8 @@ public class DroneCommentator : MonoBehaviour
         if (leftHit && rightHit && speed > 5f && !isTalking){
             TriggerCommentary("tight gap navigation", "obstacles");
         }
+
+        lastAngularVelocity = rb.angularVelocity; // update spin for next frame
     }
 
     void OnCollisionEnter(Collision collision){
@@ -125,8 +126,8 @@ public class DroneCommentator : MonoBehaviour
 
     // custom instruction for high-skill moments
     string skillBonus = "";
-    if (eventType == "smooth turn" || eventType == "clean gap pass"){
-        skillBonus = " IMPORTANT: You must start your response with 'chat is that rizz' because the pilot was smooth.";
+    if (eventType == "smooth turn" || eventType == "tight gap navigation" || eventType == "goal reached"){        
+        skillBonus = " IMPORTANT: Start your response with 'chat is that rizz'.";
     }
 
     // build prompts

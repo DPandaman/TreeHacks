@@ -1,13 +1,16 @@
 # RealityRip | TreeHacks 2026
 
 **Team Members:**
-* [Member 1 Name]
-* [Member 2 Name]
-* [Member 3 Name]
-* [Member 4 Name]
+* [Devanshu Pandya] (UIUC)
+* [Julia Jiang] (Stanford)
+* [Koichi Kimoto] (Stanford)
+* [Rohan Godha] (Georgia Tech)
 
 ## 🎯 Objective
 An AI-native drone flight simulator that combines high-fidelity **Gaussian Splatting** environments with a real-time **Generative AI Flight Commentator**. We bridge the gap between realistic drone physics and interactive, personality-driven feedback to create a more engaging pilot training experience.
+
+## Motivation 
+TODO: fill this out 
 
 ## 🚀 Features
 
@@ -52,8 +55,7 @@ We use real-time physics data to drive the AI's understanding of the flight:
 ## 📦 Setup & Installation
 1. **Clone the repository.**
 2. **Unity Version:** Open in Unity 2022.3+ or Unity 6.
-3. **API Configuration:** Select the `AI_Manager` object.
-   * Paste your `OPENAI_API_KEY` into the Inspector field.
+3. **API Configuration:** Ensure you have your OpenAI API key set as an environment variable (OPENAI_API_KEY) on your system. The AIService.cs script will pull this automatically.
 4. **Hardware:** Connect your RadioMaster Pocket via USB-C (Game Controller mode).
 5. **Press Play** and fly!
 

@@ -11,8 +11,6 @@
 ## 🎯 Objective
 An AI-native drone flight simulator that combines high-fidelity **Gaussian Splatting** environments with a real-time **Generative AI Flight Commentator**. We bridge the gap between realistic drone physics and interactive, personality-driven feedback to create a more engaging pilot training experience.
 
----
-
 ## 🚀 Features
 
 ### 🧠 Real-Time Generative Commentary
@@ -32,15 +30,12 @@ Custom C# controller designed for the **RadioMaster Pocket** (or standard gamepa
 ### ✨ Gaussian Splatting Environments
 Instead of traditional low-poly assets, we use 3D reconstructions of real-world spaces, providing an immersive training ground for pilots.
 
----
-
 ## 🛠 Technical Stack
 * **Engine:** Unity (C#)
 * **AI Engine:** OpenAI API (GPT-4o)
 * **Input:** Unity Input System (RadioMaster/Joystick support)
 * **Environment:** Gaussian Splatting / 3D Reconstruction
 
----
 
 ### 🌐 Digital Twin Integration
 The simulator functions as a **Digital Twin** of real-world environments. By utilizing Gaussian Splatting for spatial accuracy and real-time telemetry-driven AI, we create a closed-loop system where:
@@ -48,7 +43,6 @@ The simulator functions as a **Digital Twin** of real-world environments. By uti
 * **Physics Mirroring:** Rigidbody dynamics simulate real-world flight constraints (mass, drag, and thrust-to-weight ratios).
 * **AI Observer:** The generative commentator acts as a digital twin of a flight instructor, providing objective telemetry analysis disguised as personality-driven feedback.
 
----
 
 ## 📐 Mathematical Triggers 
 We use real-time physics data to drive the AI's understanding of the flight:
@@ -56,7 +50,6 @@ We use real-time physics data to drive the AI's understanding of the flight:
 * **Upside-Down Check:** Dot product of `transform.up` and `Vector3.down`.
 * **Proximity Sensing:** Forward and side-channel `Raycasting` for "near miss" and "tight gap" detection.
 
----
 
 ## 📦 Setup & Installation
 1. **Clone the repository.**

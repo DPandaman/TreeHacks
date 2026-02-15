@@ -42,7 +42,7 @@ Instead of traditional low-poly assets, we use 3D reconstructions of real-world 
 
 ---
 
-## 📐 Mathematical Triggers (The "EE" Side)
+## 📐 Mathematical Triggers 
 We use real-time physics data to drive the AI's understanding of the flight:
 * **Jerk Detection:** $\Delta$ Angular Velocity / $\Delta$ Time (detects snapping turns).
 * **Upside-Down Check:** Dot product of `transform.up` and `Vector3.down`.
@@ -53,7 +53,7 @@ We use real-time physics data to drive the AI's understanding of the flight:
 ## 📦 Setup & Installation
 1. **Clone the repository.**
 2. **Unity Version:** Open in Unity 2022.3+ or Unity 6.
-3. **API Configuration:** * Select the `AI_Manager` object.
+3. **API Configuration:** Select the `AI_Manager` object.
    * Paste your `OPENAI_API_KEY` into the Inspector field.
 4. **Hardware:** Connect your RadioMaster Pocket via USB-C (Game Controller mode).
 5. **Press Play** and fly!

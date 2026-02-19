@@ -1,6 +1,9 @@
 # RealityRip | TreeHacks 2026
 
-
+* Devanshu Pandya (University of Illinois)
+* Julia Jiang (Stanford University)
+* Koichi Kimoto (Stanford University)
+* Rohan Godha (Georgia-Tech)
 
 ## Objective
 A drone flight simulator that combines high-fidelity Gaussian Splatting digital twin environments with a generative AI commentator. Our goal was to train fpv drone pilots in digital twins of real environments they’d fly in, and give them live feedback to keep them engaged. Using an iPhone, RealityRip can reconstruct a room or building into a navigable 3D model within minutes. The generated digital twin can be flown through immediately or modified to simulate obstacles, hazards, or mission scenarios.
@@ -39,8 +42,8 @@ One of the most important parts of FPV sims is ensuring that they match the phys
 4. **Hardware:** Connect your RadioMaster Pocket via USB-C (Game Controller mode).
 5. **Press Play** and fly!
 
-Team Members:
+<!-- Team Members:
 * Devanshu Pandya (University of Illinois)
 * Julia Jiang (Stanford University)
 * Koichi Kimoto (Stanford University)
-* Rohan Godha (Georgia-Tech)
+* Rohan Godha (Georgia-Tech) -->
